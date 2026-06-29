@@ -365,6 +365,8 @@
       <a class="contact-pill" href="tel:+917249391830">📱 +91 7249391830</a>
       <a class="contact-pill" href="https://github.com/bhoomi-wadhwani" target="_blank">💻 GitHub</a>
       <a class="contact-pill" href="#" target="_blank">🔗 LinkedIn</a>
+      <a class="contact-pill" id="websitePill" href="#" target="_blank">🌐 Website</a>
+      <button class="ic-btn" id="editWebsiteBtn" style="display:none;width:auto;padding:0 10px;height:38px;border-radius:30px;">✎ edit link</button>
       <button class="contact-pill" id="resumeBtnFooter" style="cursor:pointer;">📄 View resume</button>
     </div>
   </div>
@@ -378,8 +380,28 @@
 
 <div class="toast" id="toast"></div>
 
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB1PhvzbZyqe2wBIRLPx10PBY1S6m8s1rs",
+  authDomain: "bhoomi-s-portfolio.firebaseapp.com",
+  projectId: "bhoomi-s-portfolio",
+  storageBucket: "bhoomi-s-portfolio.firebasestorage.app",
+  messagingSenderId: "946190216803",
+  appId: "1:946190216803:web:31bbaa8518c25cd2af1256",
+  measurementId: "G-9MRV2SQ1JW"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const dbFs = getFirestore(fbApp);
+window.__fb = { doc, getDoc, setDoc, db: dbFs };
+window.__fbReady = true;
+</script>
 <script>
-const EDIT_PASSWORD = "bhoomi2026";
+window.addEventListener('DOMContentLoaded', ()=>{});
+</script>
 let editMode = false;
 let data = null;
 
@@ -428,6 +450,7 @@ const DEFAULT_DATA = {
     {id:'a3', icon:'🌐', title:'2 live freelance websites', desc:'Shipped for international and domestic clients while still a BSc.IT student.'},
     {id:'a4', icon:'📊', title:'9.44 CGPA, consistently', desc:'Maintained throughout the entire BSc.IT program at KC College.'}
   ],
+  websiteUrl: '',
   certs: [
     {id:'c1', text:'Git & GitHub — NN Tutorials, Kalyan'},
     {id:'c2', text:'Figma (UI/UX Design) — NN Tutorials, Kalyan'},
@@ -441,6 +464,7 @@ CONTACT
 Email: bhoomiwadhwani26@gmail.com
 Phone: +91 7249391830
 Location: Ulhasnagar, Thane
+Website: (add your link here once hosted)
 
 EDUCATION
 Bachelor of Science in Information Technology (BSc.IT)
@@ -499,14 +523,50 @@ async function loadData(){
   data = JSON.parse(JSON.stringify(DEFAULT_DATA));
 }
 async function saveData(){
-  try{ await window.storage.set('portfolio-data', JSON.stringify(data), false); showToast('Saved'); }
-  catch(e){ showToast('Save failed — try again'); }
+  try{
+    if(!window.storage || !window.storage.set){ showToast('Storage unavailable in this view'); return; }
+    const payload = JSON.stringify(data);
+    const result = await window.storage.set('portfolio-data', payload, false);
+    if(!result){ showToast('Save returned no result — changes are kept in this session only'); return; }
+    showToast('Saved');
+  }
+  catch(e){
+    console.error('Save error:', e);
+    showToast('Save failed: ' + (e && e.message ? e.message : 'unknown error'));
+  }
 }
 
 function renderAll(){
   renderExperience(); renderProjects(); renderSkills(); renderTools();
   renderWorkflows(); renderAutomationTags(); renderAchievements(); renderCerts(); renderCustomCats();
+  renderWebsiteLink();
 }
+
+function renderWebsiteLink(){
+  const pill = document.getElementById('websitePill');
+  const editBtn = document.getElementById('editWebsiteBtn');
+  if(data.websiteUrl){
+    pill.href = data.websiteUrl;
+    pill.textContent = '🌐 ' + data.websiteUrl.replace(/^https?:\/\//,'');
+  } else {
+    pill.href = '#';
+    pill.textContent = '🌐 Add website link';
+  }
+  editBtn.style.display = editMode ? 'inline-flex' : 'none';
+}
+function formWebsiteLink(){
+  modalShell('Website link', `
+    <label>Your portfolio / website URL</label>
+    <input id="f_weburl" value="${escapeHtml(data.websiteUrl||'')}" placeholder="https://yourname.dev">
+  `, ()=>{
+    data.websiteUrl = document.getElementById('f_weburl').value.trim();
+    closeModal(); renderWebsiteLink(); saveData();
+  });
+}
+document.getElementById('editWebsiteBtn').addEventListener('click', formWebsiteLink);
+document.getElementById('websitePill').addEventListener('click', (e)=>{
+  if(!data.websiteUrl){ e.preventDefault(); if(editMode) formWebsiteLink(); else showToast('No website link added yet'); }
+});
 
 function renderExperience(){
   const el = document.getElementById('experienceList');
@@ -848,7 +908,11 @@ function showErr(msg){ const e=document.getElementById('mErr'); e.textContent=ms
 
 // ---------- Resume modal ----------
 function renderResumeView(){
-  const blocks = data.resume.split('\\n\\n');
+  let resumeText = data.resume;
+  if(data.websiteUrl){
+    resumeText = resumeText.replace(/Website:.*(?:\n|$)/, `Website: ${data.websiteUrl}\n`);
+  }
+  const blocks = resumeText.split('\\n\\n');
   const html = blocks.map(b=>{
     const lines = b.split('\\n');
     const head = lines[0];
@@ -881,14 +945,14 @@ document.getElementById('editToggleBtn').addEventListener('click', ()=>{
     document.body.classList.remove('edit-mode');
     document.getElementById('editToggleBtn').textContent = 'Edit';
     document.getElementById('editToggleBtn').classList.remove('editing');
-    renderAutomationTags(); renderCustomCats();
+    renderAutomationTags(); renderCustomCats(); renderWebsiteLink();
   } else {
     askPassword(()=>{
       editMode = true;
       document.body.classList.add('edit-mode');
       document.getElementById('editToggleBtn').textContent = 'Done editing';
       document.getElementById('editToggleBtn').classList.add('editing');
-      renderAutomationTags(); renderCustomCats();
+      renderAutomationTags(); renderCustomCats(); renderWebsiteLink();
       showToast('Edit mode on');
     });
   }
